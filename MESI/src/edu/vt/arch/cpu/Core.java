@@ -5,8 +5,9 @@ import edu.vt.arch.cache.Cache;
 public class Core extends Thread{
 
 	private Cache cache;
-	public Core(Cache cache, Runnable runnable){
+	public Core(int index, Cache cache, Runnable runnable){
 		super(runnable);
+		setName("CPU " + index);
 		this.cache = cache;
 	}
 	public byte[] read(int address) {

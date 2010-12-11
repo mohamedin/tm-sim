@@ -1,15 +1,18 @@
 package edu.vt.arch.cache;
 
+import edu.vt.arch.cache.CacheBlock.State;
 import edu.vt.arch.com.AddressBus;
 import edu.vt.arch.com.DataBus;
+import edu.vt.arch.com.IBusComponent;
 import edu.vt.arch.com.SharedBus;
 import edu.vt.arch.com.Signal;
 import edu.vt.arch.mem.Stall;
 import edu.vt.util.Config;
+import edu.vt.util.Logger;
 
-public class Cache {
+public class Cache implements IBusComponent{
 
-	private Block[] blocks;
+	private CacheBlock[] blocks;
 	
 	private DataBus dataBus;
 	private AddressBus addressBus;
@@ -17,11 +20,13 @@ public class Cache {
 
 	private boolean backoff = false;
 	private int workingAddress = -1;
+	public int index;
 	
-	public Cache(int size){
-		blocks = new Block[size];
+	public Cache(int index, int size){
+		this.index = index;
+		blocks = new CacheBlock[size];
 		for (int i=0; i<blocks.length; i++)
-			blocks[i] = new Block();
+			blocks[i] = new CacheBlock();
 	}
 	
 	public void connectToDataBus(DataBus dataBus) {
@@ -35,6 +40,8 @@ public class Cache {
 	}
 
 	private void access(int address, Signal.Type type){
+		addressBus.acquire();
+		dataBus.acquire();
 		switch(cached(address)){
 			case 1:	// cache read hit 
 				Stall.stall(Config.CACHE_ACCESS_TIME); 
@@ -43,27 +50,35 @@ public class Cache {
 				writeBack(address);
 			case 0: // uncached
 				workingAddress = address;
-				addressBus.broadcast(new Signal(address, type), Config.MEM_ACCESS_TIME);
-				if(backoff)
+				addressBus.broadcast(this, new Signal(address, type));
+				Stall.stall(Config.MEM_ACCESS_TIME);
+				if(backoff){
 					Stall.stall(Config.MEM_WRITE_BACK_TIME);
+					blocks[index(address)].state = State.SHARED;
+				}
 				backoff = false;
 				workingAddress = -1;
 				break;
 		}
+		addressBus.release();
+		dataBus.release();
 	}
 	
 	public byte[] read(int address) {
 		access(address, Signal.Type.READ);
-		return blocks[index(address)].data;
+		return blocks[index(address)].getData();
 	}
 
 	public void write(int address, byte data[]) {
-		access(address, Signal.Type.WRITE);
-		blocks[index(address)].data = data;
+		access(address, Signal.Type.READ_FOR_OWNERSHIP);
+		blocks[index(address)].setData(data);
+		blocks[index(address)].state = State.MODIFIED;
 	}
 	
 	private void writeBack(int index) {
-		dataBus.broadcast(new Signal(index|blocks[index].tag, Signal.Type.WRITE, blocks[index].data), Config.MEM_WRITE_BACK_TIME);
+		dataBus.broadcast(this, new Signal(index|blocks[index].tag, Signal.Type.WRITE, blocks[index].getData()));
+		blocks[index].state = State.SHARED;
+		Stall.stall(Config.MEM_WRITE_BACK_TIME);
 	}
 	
 	private int tag(int address){
@@ -82,51 +97,63 @@ public class Cache {
 	 * 			-1	not cache and needs write back 
 	 */
 	private int cached(int address){
-		Block block = blocks[index(address)];
-		if(block.state.equals(Block.State.INVALID))
+		CacheBlock block = blocks[index(address)];
+		if(block.state.equals(CacheBlock.State.INVALID))
 			return 0;
 		if(block.tag == tag(address))
 			return 1;
-		return block.state.equals(Block.State.MODIFIED) ? -1 : 0;
+		return block.state.equals(CacheBlock.State.MODIFIED) ? -1 : 0;
 	}
 	
 	private void cache(int address, byte[] data){
 		int index = index(address);
 		if(cached(address)==-1)	// write back
 			writeBack(index);
-		blocks[index].data = data;
+		blocks[index].setData(data);
 		blocks[index].tag = tag(address);
-		blocks[index].state = Block.State.EXCLUSIVE;
+		blocks[index].state = CacheBlock.State.EXCLUSIVE;
 	}
 
 	public void signal(Signal signal) {
-		if(cached(signal.address)==1){
+		int res = cached(signal.address);
+		if(res==1 || signal.address==workingAddress){
+			Logger.debug("Processing " + signal + "@" + index);
 			int index = index(signal.address);
-			Block block = blocks[index];
+			CacheBlock block = blocks[index];
 			switch(signal.type){
 				case READ:
-					if(block.state.equals(Block.State.EXCLUSIVE))	// down-grade
-						block.state = Block.State.SHARED;
-					else if(block.state.equals(Block.State.MODIFIED)){	// write back
-						sharedBus.broadcast(new Signal(signal.address, Signal.Type.BACKOFF), 0);
+					if(block.state.equals(CacheBlock.State.EXCLUSIVE))	// down-grade
+						block.state = CacheBlock.State.SHARED;
+					else if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
+						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
 						writeBack(index|block.tag);
 					}
 					break;
-				case WRITE:
-					if(block.state.equals(Block.State.MODIFIED)){	// write back
-						sharedBus.broadcast(new Signal(signal.address, Signal.Type.BACKOFF), 0);
+				case READ_FOR_OWNERSHIP:
+					if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
+						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
 						writeBack(index|block.tag);
-					}else
-						block.state = Block.State.INVALID;	// down-grade
+					}
+					block.state = CacheBlock.State.INVALID;	// down-grade
 					break;
 				case READ_RESPONSE:
-					cache(signal.address, signal.data);
+					if(res!=1)
+						cache(signal.address, signal.data);
 					break;
 				case BACKOFF:
 					if(workingAddress == signal.address)
 						backoff = true;
 					break;
 			}
-		}
+		}else
+			Logger.debug("Discard " + signal + "@" + index + " reason:" + res);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuffer buffer = new StringBuffer("Cache");
+		for (CacheBlock block : blocks)
+			buffer.append("\n").append(block);
+		return buffer.toString();
 	}
 }

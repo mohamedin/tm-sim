@@ -1,13 +1,19 @@
-package edu.vt.arch.mem;
+package edu.vt.arch.cache;
 
 import java.util.Arrays;
 
 import edu.vt.util.Config;
 
-public class MemoryBlock {
+public class CacheBlock {
+	public static enum State { INVALID, EXCLUSIVE, SHARED, MODIFIED }
+	
+	State state;
+	int tag;
 	private byte[] data;
 	
-	MemoryBlock(){
+	CacheBlock() {
+		state = State.INVALID;
+		tag = -1;
 		data = new byte[Config.BLOCK_SIZE];
 	}
 	
@@ -22,6 +28,6 @@ public class MemoryBlock {
 	
 	@Override
 	public String toString() {
-		return Arrays.toString(data);
+		return "<" + state.toString() + "> [" + tag + "] " + Arrays.toString(data);
 	}
 }

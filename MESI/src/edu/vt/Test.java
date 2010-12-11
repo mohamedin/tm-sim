@@ -8,17 +8,34 @@ public class Test {
 	
 	public static void main(String[] args) {
 		// configuration
-		Config.CORES = 8;
-		Config.MEM_SIZE = 1024;
+		System.setProperty("verbose", "true");
+		Config.CORES = 2;
+		Config.MEM_SIZE = 4;
 		// simple program
-		Program simpleProgram = new Program(){
+		Program readProg1 = new Program(){
 			@Override
 			public void run() {
-				
+				log(read(0));
 			}
 		};
+		Program writeProg1 = new Program(){
+			@Override
+			public void run() {
+				write(0, new byte[] {5, 6});
+			}
+		};
+		Program writeProg2 = new Program(){
+			@Override
+			public void run() {
+				write(0, new byte[] {7, 8});
+			}
+		};
+		
 		// running program on 4 cores
-		new Model(simpleProgram, simpleProgram, simpleProgram, simpleProgram).start();
+		Model model = new Model(writeProg1, readProg1);
+		model.start();
+		
+		System.out.println(model);
 	}
 	
 }
