@@ -1,7 +1,7 @@
 package edu.vt.arch.com;
 
 public class Signal {
-	public enum Type { READ, WRITE, READ_RESPONSE };
+	public enum Type { READ, WRITE, READ_RESPONSE, BACKOFF };
 	
 	public Type type;
 	public int address;

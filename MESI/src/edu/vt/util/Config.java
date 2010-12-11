@@ -10,6 +10,7 @@ public class Config {
 	public static final long MEM_WRITE_BACK_TIME = 600;
 	public static final long CACHE_ACCESS_TIME = 100;
 	
-	public static final long TIME_SAFTY_MARGIN = 50;
+//	public static final long TIME_SAFTY_MARGIN = 50;
+//	public static final long SHARED_BUS_SIGNAL_TIME = 10;
 	
 }
