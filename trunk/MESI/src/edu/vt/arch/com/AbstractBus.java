@@ -9,7 +9,7 @@ import edu.vt.util.Logger;
 public abstract class AbstractBus {
 
 	public IBusComponent[] busComponents;
-	public ReentrantLock lock = new ReentrantLock();
+	public ReentrantLock lock = new ReentrantLock(true);
 	
 	protected AbstractBus(MainMemory memory, Cache[] caches){
 		busComponents = new IBusComponent[caches.length + (memory==null ? 0 : 1)];

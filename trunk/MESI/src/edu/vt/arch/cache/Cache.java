@@ -47,7 +47,7 @@ public class Cache implements IBusComponent{
 				Stall.stall(Config.CACHE_ACCESS_TIME); 
 				break;
 			case -1:  // uncached & write back needed
-				writeBack(address);
+				writeBack(index(address));
 			case 0: // uncached
 				workingAddress = address;
 				addressBus.broadcast(this, new Signal(address, type));
@@ -126,13 +126,13 @@ public class Cache implements IBusComponent{
 						block.state = CacheBlock.State.SHARED;
 					else if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
 						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
-						writeBack(index|block.tag);
+						writeBack(index);
 					}
 					break;
 				case READ_FOR_OWNERSHIP:
 					if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
 						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
-						writeBack(index|block.tag);
+						writeBack(index);
 					}
 					block.state = CacheBlock.State.INVALID;	// down-grade
 					break;
