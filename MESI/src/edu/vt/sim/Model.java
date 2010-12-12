@@ -42,6 +42,8 @@ public class Model {
 	public void start(){
 		for(Core core : cores){
 			core.start();
+		}
+		for(Core core : cores){
 			try {
 				core.join();
 			} catch (InterruptedException e) {
