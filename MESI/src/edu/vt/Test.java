@@ -12,7 +12,7 @@ public class Test {
 		Config.MEM_SIZE = 4;
 		
 		// running program on 4 cores
-		Model model = new Model(SamplePrograms.complexWriteProg, SamplePrograms.complexReadProg);
+		Model model = new Model(SamplePrograms.memTestProg);
 		model.start();
 
 		// output
