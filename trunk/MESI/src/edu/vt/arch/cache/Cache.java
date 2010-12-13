@@ -12,7 +12,9 @@ import edu.vt.util.Logger;
 
 public class Cache implements IBusComponent{
 
-	private CacheBlock[] blocks;
+	private final int index;
+	private final CacheBlock[] blocks;
+	private final int tagShift;
 	
 	private DataBus dataBus;
 	private AddressBus addressBus;
@@ -20,13 +22,13 @@ public class Cache implements IBusComponent{
 
 	private boolean backoff = false;
 	private int workingAddress = -1;
-	public int index;
 	
 	public Cache(int index, int size){
 		this.index = index;
 		blocks = new CacheBlock[size];
 		for (int i=0; i<blocks.length; i++)
 			blocks[i] = new CacheBlock();
+		tagShift = (int)(Math.log(Config.BLOCK_SIZE)/Math.log(2));
 	}
 	
 	public void connectToDataBus(DataBus dataBus) {
@@ -76,7 +78,7 @@ public class Cache implements IBusComponent{
 	}
 	
 	private void writeBack(int index) {
-		dataBus.broadcast(this, new Signal(index|blocks[index].tag, Signal.Type.WRITE, blocks[index].getData()));
+		dataBus.broadcast(this, new Signal(index|blocks[index].tag<<tagShift, Signal.Type.WRITE, blocks[index].getData()));
 		blocks[index].state = State.SHARED;
 		Stall.stall(Config.MEM_WRITE_BACK_TIME);
 	}
