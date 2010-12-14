@@ -1,5 +1,6 @@
 package edu.vt.arch.cache.mesi;
 
+import edu.vt.Test;
 import edu.vt.arch.cache.ICache;
 import edu.vt.arch.cache.mesi.CacheBlock.State;
 import edu.vt.arch.com.AddressBus;
@@ -23,6 +24,7 @@ public class Cache implements ICache{
 	private SharedBus sharedBus;
 
 	private boolean backoff = false;
+	private boolean nonExclusive = false;
 	private int workingAddress = -1;
 	
 	public Cache(int index, int size){
@@ -62,6 +64,7 @@ public class Cache implements ICache{
 					blocks[index(address)].state = State.SHARED;
 				}
 				backoff = false;
+				nonExclusive = false;
 				workingAddress = -1;
 				break;
 		}
@@ -136,7 +139,7 @@ public class Cache implements ICache{
 			writeBack(index);
 		blocks[index].setData(data);
 		blocks[index].tag = tag(address);
-		blocks[index].state = CacheBlock.State.EXCLUSIVE;
+		blocks[index].state = nonExclusive ? CacheBlock.State.SHARED : CacheBlock.State.EXCLUSIVE;
 	}
 
 	public void signal(Signal signal) {
@@ -147,9 +150,10 @@ public class Cache implements ICache{
 			CacheBlock block = blocks[index];
 			switch(signal.type){
 				case READ:
-					if(block.state.equals(CacheBlock.State.EXCLUSIVE))	// down-grade
+					if(block.state.equals(CacheBlock.State.EXCLUSIVE)){	// down-grade
+						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.NON_EXCLUSIVE));
 						block.state = CacheBlock.State.SHARED;
-					else if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
+					}else if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
 						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
 						writeBack(index);
 					}
@@ -164,6 +168,10 @@ public class Cache implements ICache{
 				case READ_RESPONSE:
 					if(res!=1)
 						cache(signal.address, signal.data);
+					break;
+				case NON_EXCLUSIVE:
+					if(workingAddress == signal.address)
+						nonExclusive = true;
 					break;
 				case BACKOFF:
 					if(workingAddress == signal.address)
