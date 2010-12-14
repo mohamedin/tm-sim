@@ -3,7 +3,7 @@ package edu.vt.arch.com;
 import java.util.Arrays;
 
 public class Signal {
-	public enum Type { READ, WRITE, READ_RESPONSE, READ_FOR_OWNERSHIP, BACKOFF };
+	public enum Type { READ, WRITE, READ_RESPONSE, READ_FOR_OWNERSHIP, BACKOFF, NON_EXCLUSIVE };
 	
 	public Type type;
 	public int address;
