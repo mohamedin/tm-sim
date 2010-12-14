@@ -1,20 +1,20 @@
-package edu.vt.arch.cache;
+package edu.vt.arch.cache.tm1;
 
-import edu.vt.arch.cache.CacheBlock.State;
+import edu.vt.arch.cache.ICache;
+import edu.vt.arch.cache.tm1.CacheBlock.State;
 import edu.vt.arch.com.AddressBus;
 import edu.vt.arch.com.DataBus;
-import edu.vt.arch.com.IBusComponent;
 import edu.vt.arch.com.SharedBus;
 import edu.vt.arch.com.Signal;
 import edu.vt.arch.mem.Stall;
+import edu.vt.sim.tm.TransactionConflictException;
 import edu.vt.util.Config;
 import edu.vt.util.Logger;
 
-public abstract class Cache implements IBusComponent{
+public class Cache implements ICache{
 
 	private final int index;
 	private final CacheBlock[] blocks;
-	private final int tagShift;
 	
 	private DataBus dataBus;
 	private AddressBus addressBus;
@@ -23,12 +23,14 @@ public abstract class Cache implements IBusComponent{
 	private boolean backoff = false;
 	private int workingAddress = -1;
 	
+	private boolean transactionActive = false;
+	private boolean transactionAborted = false;
+	
 	public Cache(int index, int size){
 		this.index = index;
-		blocks = new CacheBlock[size];
+		blocks = new CacheBlock[size * Config.BLOCK_SIZE];	// fully associative
 		for (int i=0; i<blocks.length; i++)
 			blocks[i] = new CacheBlock();
-		tagShift = (int)(Math.log(Config.BLOCK_SIZE)/Math.log(2));
 	}
 	
 	public void connectToDataBus(DataBus dataBus) {
@@ -42,28 +44,35 @@ public abstract class Cache implements IBusComponent{
 	}
 
 	private void access(int address, Signal.Type type){
-		addressBus.acquire();
-		dataBus.acquire();
-		switch(cached(address)){
-			case 1:	// cache read hit 
-				Stall.stall(Config.CACHE_ACCESS_TIME); 
-				break;
-			case -1:  // uncached & write back needed
-				writeBack(index(address));
-			case 0: // uncached
-				workingAddress = address;
-				addressBus.broadcast(this, new Signal(address, type));
-				Stall.stall(Config.MEM_ACCESS_TIME);
-				if(backoff){
-					Stall.stall(Config.MEM_WRITE_BACK_TIME);
-					blocks[index(address)].state = State.SHARED;
-				}
-				backoff = false;
-				workingAddress = -1;
-				break;
+		try {
+			addressBus.acquire();
+			dataBus.acquire();
+			if(transactionActive && transactionAborted){
+				transactionActive = transactionAborted = false;
+				throw new TransactionConflictException();
+			}
+			switch(cached(address)){
+				case 1:	// cache read hit 
+					Stall.stall(Config.CACHE_ACCESS_TIME); 
+					break;
+				case -1:  // uncached & write back needed
+					writeBack(index(address));
+				case 0: // uncached
+					workingAddress = address;
+					addressBus.broadcast(this, new Signal(address, type));
+					Stall.stall(Config.MEM_ACCESS_TIME);
+					if(backoff){
+						Stall.stall(Config.MEM_WRITE_BACK_TIME);
+						blocks[index(address)].state = State.SHARED;
+					}
+					backoff = false;
+					workingAddress = -1;
+					break;
+			}
+		} finally {
+			addressBus.release();
+			dataBus.release();
 		}
-		addressBus.release();
-		dataBus.release();
 	}
 	
 	public byte[] read(int address) {
@@ -78,16 +87,20 @@ public abstract class Cache implements IBusComponent{
 	}
 	
 	private void writeBack(int index) {
-		dataBus.broadcast(this, new Signal(index|blocks[index].tag<<tagShift, Signal.Type.WRITE, blocks[index].getData()));
+		dataBus.broadcast(this, new Signal(blocks[index].address, Signal.Type.WRITE, blocks[index].getData()));
 		blocks[index].state = State.SHARED;
 		Stall.stall(Config.MEM_WRITE_BACK_TIME);
 	}
 	
-	private int tag(int address){
-		return address/blocks.length;
-	}
-	
 	private int index(int address){
+		for(int i=0; i<blocks.length; i++)
+			if(blocks[i].address==address)
+				return i;
+		
+		for(int i=0; i<blocks.length; i++)
+			if(blocks[i].state.equals(State.INVALID))
+				return i;
+		
 		return address%blocks.length;
 	}
 	
@@ -102,7 +115,7 @@ public abstract class Cache implements IBusComponent{
 		CacheBlock block = blocks[index(address)];
 		if(block.state.equals(CacheBlock.State.INVALID))
 			return 0;
-		if(block.tag == tag(address))
+		if(block.address == address)
 			return 1;
 		return block.state.equals(CacheBlock.State.MODIFIED) ? -1 : 0;
 	}
@@ -112,7 +125,7 @@ public abstract class Cache implements IBusComponent{
 		if(cached(address)==-1)	// write back
 			writeBack(index);
 		blocks[index].setData(data);
-		blocks[index].tag = tag(address);
+		blocks[index].address = address;
 		blocks[index].state = CacheBlock.State.EXCLUSIVE;
 	}
 
@@ -124,17 +137,35 @@ public abstract class Cache implements IBusComponent{
 			CacheBlock block = blocks[index];
 			switch(signal.type){
 				case READ:
-					if(block.state.equals(CacheBlock.State.EXCLUSIVE))	// down-grade
-						block.state = CacheBlock.State.SHARED;
+					if(block.state.equals(CacheBlock.State.EXCLUSIVE)){	// down-grade
+						if(transactionActive){
+							transactionAborted = true;
+							block.state = CacheBlock.State.INVALID;
+							Logger.info("Transaction Aborted @" + index);
+						}else{
+							block.state = CacheBlock.State.SHARED;
+						}
+					}
 					else if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
-						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
-						writeBack(index);
+						if(transactionActive){
+							transactionAborted = true;
+							block.state = CacheBlock.State.INVALID;
+							Logger.info("Transaction Aborted @" + index);
+						}else{
+							sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
+							writeBack(index);
+						}
 					}
 					break;
 				case READ_FOR_OWNERSHIP:
 					if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
-						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
-						writeBack(index);
+						if(transactionActive){
+							transactionAborted = true;
+							Logger.info("Transaction Aborted @" + index);
+						}else{
+							sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
+							writeBack(index);
+						}
 					}
 					block.state = CacheBlock.State.INVALID;	// down-grade
 					break;
@@ -157,5 +188,13 @@ public abstract class Cache implements IBusComponent{
 		for (CacheBlock block : blocks)
 			buffer.append("\n").append(block);
 		return buffer.toString();
+	}
+
+	public void tryCommit() {
+		transactionActive = false;
+	}
+
+	public void startTM() {
+		transactionActive = true;	
 	}
 }

@@ -1,10 +1,10 @@
 package edu.vt.arch.com;
 
-import edu.vt.arch.cache.Cache;
+import edu.vt.arch.cache.ICache;
 
 public class SharedBus extends AbstractBus{
 
-	public SharedBus(Cache[] caches) {
+	public SharedBus(ICache[] caches) {
 		super(null, caches);
 	}
 

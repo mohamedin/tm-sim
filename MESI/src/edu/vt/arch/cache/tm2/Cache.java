@@ -1,6 +1,6 @@
-package edu.vt.arch.cache;
+package edu.vt.arch.cache.tm2;
 
-import edu.vt.arch.cache.CacheBlock.State;
+import edu.vt.arch.cache.ICache;
 import edu.vt.arch.com.AddressBus;
 import edu.vt.arch.com.DataBus;
 import edu.vt.arch.com.SharedBus;
@@ -9,9 +9,9 @@ import edu.vt.arch.mem.Stall;
 import edu.vt.util.Config;
 import edu.vt.util.Logger;
 
-public class TM_Cache extends Cache{
+public class Cache implements ICache{
 
-	private TM_CacheBlock[] blocks;
+	private CacheBlock[] blocks;
 	
 	private DataBus dataBus;
 	private AddressBus addressBus;
@@ -23,12 +23,11 @@ public class TM_Cache extends Cache{
 	
 	private boolean aborted = false;
 	
-	public TM_Cache(int index, int size){
-		super(index, size);
+	public Cache(int index, int size){
 		this.index = index;
-		blocks = new TM_CacheBlock[size];
+		blocks = new CacheBlock[size];
 		for (int i=0; i<blocks.length; i++)
-			blocks[i] = new TM_CacheBlock();
+			blocks[i] = new CacheBlock();
 	}
 	
 	public void connectToDataBus(DataBus dataBus) {
@@ -44,16 +43,16 @@ public class TM_Cache extends Cache{
 	private int findBlockForReplacement(){	
 		//not cached so find an empty line 
 		for (int i=0; i<blocks.length; i++)
-			if (blocks[i].tm_state == TM_CacheBlock.TM_State.EMPTY)
+			if (blocks[i].tm_state == CacheBlock.TM_State.EMPTY)
 				return i;
 		//then noraml line
 		for (int i=0; i<blocks.length; i++)
-			if (blocks[i].tm_state == TM_CacheBlock.TM_State.NORMAL)
+			if (blocks[i].tm_state == CacheBlock.TM_State.NORMAL)
 				return i;
 		//finally xcommit
 		for (int i=0; i<blocks.length; i++)
-			if (blocks[i].tm_state == TM_CacheBlock.TM_State.XCOMMIT){
-				if (blocks[i].state == TM_CacheBlock.State.MODIFIED){//Issue writeback
+			if (blocks[i].tm_state == CacheBlock.TM_State.XCOMMIT){
+				if (blocks[i].state == CacheBlock.State.MODIFIED){//Issue writeback
 					addressBus.acquire();
 					dataBus.acquire();					
 					writeBack(i);
@@ -72,17 +71,17 @@ public class TM_Cache extends Cache{
 		//check if it is cached
 		for (int i=0; i<blocks.length; i++){
 			if (blocks[i].address == address){
-				if (blocks[i].tm_state == TM_CacheBlock.TM_State.XABORT){
+				if (blocks[i].tm_state == CacheBlock.TM_State.XABORT){
 					Stall.stall(Config.CACHE_ACCESS_TIME); 
 					return blocks[i].getData();
 				}
-				else if (blocks[i].tm_state == TM_CacheBlock.TM_State.NORMAL){
+				else if (blocks[i].tm_state == CacheBlock.TM_State.NORMAL){
 					Stall.stall(Config.CACHE_ACCESS_TIME); 
-					blocks[i].tm_state = TM_CacheBlock.TM_State.XABORT;
+					blocks[i].tm_state = CacheBlock.TM_State.XABORT;
 					int another = findBlockForReplacement();
 					blocks[another].address = address;
-					blocks[another].state = TM_CacheBlock.State.EXCLUSIVE;//TODO: Check
-					blocks[another].tm_state = TM_CacheBlock.TM_State.XCOMMIT;
+					blocks[another].state = CacheBlock.State.EXCLUSIVE;//TODO: Check
+					blocks[another].tm_state = CacheBlock.TM_State.XCOMMIT;
 					blocks[another].setData(blocks[i].getData());
 					return blocks[i].getData();
 				}
@@ -98,11 +97,11 @@ public class TM_Cache extends Cache{
 			Stall.stall(Config.MEM_WRITE_BACK_TIME);
 			aborted = true;
 			for (int i=0; i<blocks.length; i++){
-				if (blocks[i].tm_state.equals(TM_CacheBlock.TM_State.XCOMMIT)){
-					blocks[i].tm_state = TM_CacheBlock.TM_State.NORMAL;
-				}else if (blocks[i].tm_state.equals(TM_CacheBlock.TM_State.XABORT)){
-					blocks[i].tm_state = TM_CacheBlock.TM_State.EMPTY;
-					blocks[i].state = TM_CacheBlock.State.INVALID;
+				if (blocks[i].tm_state.equals(CacheBlock.TM_State.XCOMMIT)){
+					blocks[i].tm_state = CacheBlock.TM_State.NORMAL;
+				}else if (blocks[i].tm_state.equals(CacheBlock.TM_State.XABORT)){
+					blocks[i].tm_state = CacheBlock.TM_State.EMPTY;
+					blocks[i].state = CacheBlock.State.INVALID;
 				}
 			}
 //			blocks[index(address)].state = State.SHARED;
@@ -121,21 +120,21 @@ public class TM_Cache extends Cache{
 		//check if it is cached
 		for (int i=0; i<blocks.length; i++){
 			if (blocks[i].address == address){
-				if (blocks[i].tm_state == TM_CacheBlock.TM_State.XABORT){
+				if (blocks[i].tm_state == CacheBlock.TM_State.XABORT){
 					Stall.stall(Config.CACHE_ACCESS_TIME);
 					blocks[i].setData(data);
-					blocks[i].state = TM_CacheBlock.State.MODIFIED;
+					blocks[i].state = CacheBlock.State.MODIFIED;
 					return;
 				}
-				else if (blocks[i].tm_state == TM_CacheBlock.TM_State.NORMAL){
+				else if (blocks[i].tm_state == CacheBlock.TM_State.NORMAL){
 					Stall.stall(Config.CACHE_ACCESS_TIME); 
-					blocks[i].tm_state = TM_CacheBlock.TM_State.XABORT;
+					blocks[i].tm_state = CacheBlock.TM_State.XABORT;
 					blocks[i].setData(data);
-					blocks[i].state = TM_CacheBlock.State.MODIFIED;					
+					blocks[i].state = CacheBlock.State.MODIFIED;					
 					int another = findBlockForReplacement();
 					blocks[another].address = address;
-					blocks[another].state = TM_CacheBlock.State.EXCLUSIVE;//TODO: Check
-					blocks[another].tm_state = TM_CacheBlock.TM_State.XCOMMIT;
+					blocks[another].state = CacheBlock.State.EXCLUSIVE;//TODO: Check
+					blocks[another].tm_state = CacheBlock.TM_State.XCOMMIT;
 					blocks[another].setData(blocks[i].getData());
 					return;
 				}
@@ -151,11 +150,11 @@ public class TM_Cache extends Cache{
 			Stall.stall(Config.MEM_WRITE_BACK_TIME);
 			aborted = true;
 			for (int i=0; i<blocks.length; i++){
-				if (blocks[i].tm_state.equals(TM_CacheBlock.TM_State.XCOMMIT)){
-					blocks[i].tm_state = TM_CacheBlock.TM_State.NORMAL;
-				}else if (blocks[i].tm_state.equals(TM_CacheBlock.TM_State.XABORT)){
-					blocks[i].tm_state = TM_CacheBlock.TM_State.EMPTY;
-					blocks[i].state = TM_CacheBlock.State.INVALID;
+				if (blocks[i].tm_state.equals(CacheBlock.TM_State.XCOMMIT)){
+					blocks[i].tm_state = CacheBlock.TM_State.NORMAL;
+				}else if (blocks[i].tm_state.equals(CacheBlock.TM_State.XABORT)){
+					blocks[i].tm_state = CacheBlock.TM_State.EMPTY;
+					blocks[i].state = CacheBlock.State.INVALID;
 				}
 			}
 //			blocks[index(address)].state = State.SHARED;
@@ -166,9 +165,9 @@ public class TM_Cache extends Cache{
 		dataBus.release();
 		
 		for (int i=0; i<blocks.length; i++){
-			if (blocks[i].address == address && blocks[i].tm_state.equals(TM_CacheBlock.TM_State.XABORT)){
+			if (blocks[i].address == address && blocks[i].tm_state.equals(CacheBlock.TM_State.XABORT)){
 				blocks[i].setData(data);
-				blocks[i].state = TM_CacheBlock.State.MODIFIED;
+				blocks[i].state = CacheBlock.State.MODIFIED;
 				return;
 			}
 		}
@@ -176,7 +175,7 @@ public class TM_Cache extends Cache{
 	
 	private void writeBack(int index) {
 		dataBus.broadcast(this, new Signal(blocks[index].address, Signal.Type.WRITE, blocks[index].getData()));
-		blocks[index].state = TM_CacheBlock.State.SHARED;
+		blocks[index].state = CacheBlock.State.SHARED;
 		Stall.stall(Config.MEM_WRITE_BACK_TIME);
 	}
 	
@@ -197,7 +196,7 @@ public class TM_Cache extends Cache{
 	private int cached(int address){
 		//fully associative so wether it exists or not 
 		int i = index(address);
-		if (i==-1 || blocks[i].state.equals(TM_CacheBlock.State.INVALID))
+		if (i==-1 || blocks[i].state.equals(CacheBlock.State.INVALID))
 			return 0;
 		else
 			return 1;
@@ -206,13 +205,13 @@ public class TM_Cache extends Cache{
 	private void cache(int index, int address, byte[] data){
 		blocks[index].setData(data);
 		blocks[index].address = address;
-		blocks[index].state = TM_CacheBlock.State.EXCLUSIVE;
-		blocks[index].tm_state = TM_CacheBlock.TM_State.XCOMMIT;
+		blocks[index].state = CacheBlock.State.EXCLUSIVE;
+		blocks[index].tm_state = CacheBlock.TM_State.XCOMMIT;
 		index = findBlockForReplacement();
 		blocks[index].setData(data);
 		blocks[index].address = address;
-		blocks[index].state = TM_CacheBlock.State.EXCLUSIVE;
-		blocks[index].tm_state = TM_CacheBlock.TM_State.XABORT;
+		blocks[index].state = CacheBlock.State.EXCLUSIVE;
+		blocks[index].tm_state = CacheBlock.TM_State.XABORT;
 	}
 
 	public void signal(Signal signal) {
@@ -222,22 +221,22 @@ public class TM_Cache extends Cache{
 			int index = index(signal.address);
 			if (index == -1) //not in cache
 				index = findBlockForReplacement();
-			TM_CacheBlock block = blocks[index];
+			CacheBlock block = blocks[index];
 			switch(signal.type){
 				case READ:
-					if(block.state.equals(TM_CacheBlock.State.EXCLUSIVE))	// down-grade
-						block.state = TM_CacheBlock.State.SHARED;
-					else if(block.state.equals(TM_CacheBlock.State.MODIFIED)){	// write back
+					if(block.state.equals(CacheBlock.State.EXCLUSIVE))	// down-grade
+						block.state = CacheBlock.State.SHARED;
+					else if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
 						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
 						writeBack(index);//TODO: check
 					}
 					break;
 				case READ_FOR_OWNERSHIP:
-					if(block.state.equals(TM_CacheBlock.State.MODIFIED)){	// write back
+					if(block.state.equals(CacheBlock.State.MODIFIED)){	// write back
 						sharedBus.broadcast(this, new Signal(signal.address, Signal.Type.BACKOFF));
 						writeBack(index);//TODO: check
 					}
-					block.state = TM_CacheBlock.State.INVALID;	// down-grade
+					block.state = CacheBlock.State.INVALID;	// down-grade
 					break;
 				case READ_RESPONSE:
 					if(res!=1)
@@ -255,7 +254,7 @@ public class TM_Cache extends Cache{
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer("Cache");
-		for (TM_CacheBlock block : blocks)
+		for (CacheBlock block : blocks)
 			buffer.append("\n").append(block);
 		return buffer.toString();
 	}

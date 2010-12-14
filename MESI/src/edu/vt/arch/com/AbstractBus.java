@@ -2,7 +2,7 @@ package edu.vt.arch.com;
 
 import java.util.concurrent.locks.ReentrantLock;
 
-import edu.vt.arch.cache.Cache;
+import edu.vt.arch.cache.ICache;
 import edu.vt.arch.mem.MainMemory;
 import edu.vt.util.Logger;
 
@@ -11,7 +11,7 @@ public abstract class AbstractBus {
 	public IBusComponent[] busComponents;
 	public ReentrantLock lock = new ReentrantLock(true);
 	
-	protected AbstractBus(MainMemory memory, Cache[] caches){
+	protected AbstractBus(MainMemory memory, ICache[] caches){
 		busComponents = new IBusComponent[caches.length + (memory==null ? 0 : 1)];
 		int offset = 0;
 		if(memory!=null)

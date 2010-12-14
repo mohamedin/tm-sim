@@ -5,8 +5,7 @@ import edu.vt.sim.Program;
 public class SamplePrograms {
 
 	static Program complexReadProg = new Program(){
-		@Override
-		public void run() {
+		public void execute() {
 			log(read(0));
 			log(read(1));
 			log(read(2));
@@ -17,8 +16,7 @@ public class SamplePrograms {
 	};
 	
 	static Program complexWriteProg = new Program(){
-		@Override
-		public void run() {
+		public void execute() {
 			write(0, new byte[] {5, 6});
 			write(1, new byte[] {5, 6});
 			write(2, new byte[] {5, 6});
@@ -30,8 +28,7 @@ public class SamplePrograms {
 
 
 	static Program memTestProg = new Program(){
-		@Override
-		public void run() {
+		public void execute() {
 			write(0, new byte[] {0, 1});
 			write(1, new byte[] {2, 3});
 			write(2, new byte[] {4, 5});
@@ -44,16 +41,32 @@ public class SamplePrograms {
 	};
 	
 	static Program simpleReadProg = new Program(){
-		@Override
-		public void run() {
-			log(read(0));
+		public void execute() {
+			read(1);
 		}
 	};
 	
 	static Program simpleWriteProg = new Program(){
-		@Override
-		public void run() {
-			write(0, new byte[] {7, 8});
+		public void execute() {
+			write(1, new byte[] {7, 8});
+		}
+	};
+	
+	static Program TM1_Prog = new edu.vt.sim.tm.Program(){
+		public void execute() {
+			atomic_begin();
+			write(1, new byte[] {1, 2});
+			write(2, new byte[] {3, 4});
+			atomic_end();
+		}
+	};
+	
+	static Program TM2_Prog = new edu.vt.sim.tm.Program(){
+		public void execute() {
+			atomic_begin();
+			write(1, new byte[] {5, 6});
+			write(2, new byte[] {7, 8});
+			atomic_end();
 		}
 	};
 }

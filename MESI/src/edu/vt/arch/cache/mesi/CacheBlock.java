@@ -1,4 +1,4 @@
-package edu.vt.arch.cache;
+package edu.vt.arch.cache.mesi;
 
 import java.util.Arrays;
 
@@ -7,11 +7,11 @@ import edu.vt.util.Config;
 public class CacheBlock {
 	public static enum State { INVALID, EXCLUSIVE, SHARED, MODIFIED }
 	
-	State state;
-	int tag;
+	public State state;
+	public int tag;
 	private byte[] data;
 	
-	CacheBlock() {
+	public CacheBlock() {
 		state = State.INVALID;
 		tag = -1;
 		data = new byte[Config.BLOCK_SIZE];
