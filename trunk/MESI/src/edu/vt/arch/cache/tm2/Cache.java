@@ -259,4 +259,10 @@ public class Cache implements ICache{
 		return buffer.toString();
 	}
 
+	@Override
+	public byte[] test_and_set(int address, byte[] data) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }

@@ -19,9 +19,7 @@ public abstract class Program implements Runnable{
 	}
 
 	protected byte[] test_and_set(int address, byte[] data){
-		byte[] old = read(address).clone();
-		write(address, data);
-		return old;
+		return core.test_and_set(address, data);
 	}
 	
 	protected void log(byte[] data){

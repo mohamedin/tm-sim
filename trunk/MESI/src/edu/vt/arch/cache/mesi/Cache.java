@@ -7,6 +7,7 @@ import edu.vt.arch.com.DataBus;
 import edu.vt.arch.com.IBusComponent;
 import edu.vt.arch.com.SharedBus;
 import edu.vt.arch.com.Signal;
+import edu.vt.arch.com.Signal.Type;
 import edu.vt.arch.mem.Stall;
 import edu.vt.util.Config;
 import edu.vt.util.Logger;
@@ -43,9 +44,10 @@ public class Cache implements ICache{
 	}
 
 	private void access(int address, Signal.Type type){
-		addressBus.acquire();
-		dataBus.acquire();
-		switch(cached(address)){
+		int cacheStatus = cached(address);
+		if(cacheStatus==1 && blocks[index(address)].state.equals(State.SHARED) && type.equals(Type.READ_FOR_OWNERSHIP))
+			cacheStatus = 0;
+		switch(cacheStatus){
 			case 1:	// cache read hit 
 				Stall.stall(Config.CACHE_ACCESS_TIME); 
 				break;
@@ -63,17 +65,37 @@ public class Cache implements ICache{
 				workingAddress = -1;
 				break;
 		}
+	}
+	
+	private void busAcquire(int address, Signal.Type type){
+		addressBus.acquire();
+		dataBus.acquire();
+		access(address, type);
 		addressBus.release();
 		dataBus.release();
 	}
-	
-	public byte[] read(int address) {
+
+	@Override
+	public byte[] test_and_set(int address, byte[] data) {
+		addressBus.acquire();
+		dataBus.acquire();
 		access(address, Signal.Type.READ);
+		byte[] old = blocks[index(address)].getData().clone();
+		access(address, Signal.Type.READ_FOR_OWNERSHIP);
+		blocks[index(address)].setData(data);
+		blocks[index(address)].state = State.MODIFIED;
+		addressBus.release();
+		dataBus.release();
+		return old;
+	}
+
+	public byte[] read(int address) {
+		busAcquire(address, Signal.Type.READ);
 		return blocks[index(address)].getData();
 	}
 
 	public void write(int address, byte data[]) {
-		access(address, Signal.Type.READ_FOR_OWNERSHIP);
+		busAcquire(address, Signal.Type.READ_FOR_OWNERSHIP);
 		blocks[index(address)].setData(data);
 		blocks[index(address)].state = State.MODIFIED;
 	}
