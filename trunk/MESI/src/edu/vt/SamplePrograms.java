@@ -103,5 +103,46 @@ public class SamplePrograms {
 		}
 	};
 
+	static Program TTAS_Lock1_Prog = new edu.vt.sim.tm.Program(){
+		public void execute() {
+			byte[] data;
+			outer:while (true){
+				do{
+					data = read(0);
+				}while (data[0]==1);
+				data = test_and_set(0, new byte[]{1, 0});
+				if (data[0]==1)
+					break outer;
+			}
+
+			// critical section start
+			write(1, new byte[] {1, 2});
+			write(2, new byte[] {3, 4});
+			// critical section ends
+			
+			write(0, new byte[] {0, 0});	// release the lock
+		}
+	};
+	
+	static Program TTAS_Lock2_Prog = new edu.vt.sim.tm.Program(){
+		public void execute() {
+			byte[] data;
+			outer:while (true){
+				do{
+					data = read(0);
+				}while (data[0]==0);
+				data = test_and_set(0, new byte[]{1, 0});
+				if (data[0]==1)
+					break outer;
+			}			
+
+			// critical section start
+			write(1, new byte[] {1, 2});
+			write(2, new byte[] {3, 4});
+			// critical section ends
+			
+			write(0, new byte[] {0, 0});	// release the lock
+		}
+	};
 	
 }
