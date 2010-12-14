@@ -14,6 +14,8 @@ public class Model {
 	private MainMemory memory;
 	private ICache[] caches;
 	
+	private long simulationTime;
+	
 	public Model(Program... programs) {
 		memory = new MainMemory(Config.MEM_SIZE);
 		caches = new ICache[Config.CORES];
@@ -44,6 +46,7 @@ public class Model {
 	}
 	
 	public void start(){
+		long startTime = System.currentTimeMillis();
 		for(Core core : cores){
 			core.start();
 		}
@@ -54,6 +57,7 @@ public class Model {
 				e.printStackTrace();
 			}
 		}
+		simulationTime = System.currentTimeMillis() - startTime;
 	}
 	
 	@Override
@@ -62,7 +66,8 @@ public class Model {
 		buffer.append("Cores :").append(cores.length).append("\n");
 		for (ICache cache : caches)
 			buffer.append(cache).append("\n");
-		buffer.append(memory);
+		buffer.append(memory).append("\n");
+		buffer.append("Simulation Time:").append(simulationTime);
 		buffer.append("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		return buffer.toString();
 	}

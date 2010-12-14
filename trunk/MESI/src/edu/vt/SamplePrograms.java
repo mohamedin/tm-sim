@@ -69,4 +69,39 @@ public class SamplePrograms {
 			atomic_end();
 		}
 	};
+	
+
+	static Program Lock1_Prog = new edu.vt.sim.tm.Program(){
+		public void execute() {
+			byte[] data;
+			do{
+				data = test_and_set(0, new byte[]{1, 0});
+			}while(data[0]==1);	// successful acquire the lock
+
+			// critical section start
+			write(1, new byte[] {1, 2});
+			write(2, new byte[] {3, 4});
+			// critical section ends
+			
+			write(0, new byte[] {0, 0});	// release the lock
+		}
+	};
+	
+	static Program Lock2_Prog = new edu.vt.sim.tm.Program(){
+		public void execute() {
+			byte[] data;
+			do{
+				data = test_and_set(0, new byte[]{1, 0});
+			}while(data[0]==1);	// successful acquire the lock
+
+			// critical section start
+			write(1, new byte[] {1, 2});
+			write(2, new byte[] {3, 4});
+			// critical section ends
+			
+			write(0, new byte[] {0, 0});	// release the lock
+		}
+	};
+
+	
 }
