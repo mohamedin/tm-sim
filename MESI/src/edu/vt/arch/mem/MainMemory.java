@@ -31,7 +31,7 @@ public class MainMemory implements IBusComponent{
 				dataBus.broadcast(this, new Signal(signal.address, Signal.Type.READ_RESPONSE, blocks[signal.address].getData()));
 				break;
 			case WRITE:
-				System.out.println("change data");
+				Logger.debug("Effective data change [" + signal.address + "]");
 				blocks[signal.address].setData(signal.data);
 				break;
 		}
