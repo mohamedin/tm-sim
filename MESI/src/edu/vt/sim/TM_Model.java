@@ -1,6 +1,8 @@
 package edu.vt.sim;
 
 import edu.vt.arch.cache.Cache;
+import edu.vt.arch.cache.MESI_Cache;
+import edu.vt.arch.cache.TM_Cache;
 import edu.vt.arch.com.AddressBus;
 import edu.vt.arch.com.DataBus;
 import edu.vt.arch.com.SharedBus;
@@ -8,17 +10,17 @@ import edu.vt.arch.cpu.Core;
 import edu.vt.arch.mem.MainMemory;
 import edu.vt.util.Config;
 
-public class Model {
+public class TM_Model {
 
 	private Core[] cores;
 	private MainMemory memory;
 	private Cache[] caches;
 
-	public Model(Program... programs) {
+	public TM_Model(Program... programs) {
 		memory = new MainMemory(Config.MEM_SIZE);
 		caches = new Cache[Config.CORES];
 		for(int i=0; i<caches.length; i++)
-			caches[i] = new Cache(i, Config.MEM_SIZE / Config.BLOCK_SIZE);
+			caches[i] = new TM_Cache(i, Config.MEM_SIZE / Config.BLOCK_SIZE);
 		// Connections
 		AddressBus addressBus = new AddressBus(memory, caches);
 		DataBus dataBus = new DataBus(memory, caches);

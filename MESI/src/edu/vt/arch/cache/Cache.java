@@ -10,7 +10,7 @@ import edu.vt.arch.mem.Stall;
 import edu.vt.util.Config;
 import edu.vt.util.Logger;
 
-public class Cache implements IBusComponent{
+public abstract class Cache implements IBusComponent{
 
 	private final int index;
 	private final CacheBlock[] blocks;
