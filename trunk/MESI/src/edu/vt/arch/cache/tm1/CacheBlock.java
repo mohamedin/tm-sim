@@ -1,21 +1,18 @@
-package edu.vt.arch.cache;
+package edu.vt.arch.cache.tm1;
 
 import java.util.Arrays;
 
 import edu.vt.util.Config;
 
-public class TM_CacheBlock {
-	public static enum State { INVALID, EXCLUSIVE, SHARED, MODIFIED}
-	public static enum TM_State {EMPTY, NORMAL, XCOMMIT, XABORT}
+public class CacheBlock {
+	public static enum State { INVALID, EXCLUSIVE, SHARED, MODIFIED }
 	
 	State state;
-	TM_State tm_state;
 	int address;
 	private byte[] data;
 	
-	TM_CacheBlock() {
+	CacheBlock() {
 		state = State.INVALID;
-		tm_state = TM_State.EMPTY;
 		address = -1;
 		data = new byte[Config.BLOCK_SIZE];
 	}
@@ -31,6 +28,6 @@ public class TM_CacheBlock {
 	
 	@Override
 	public String toString() {
-		return "<" + state.toString() + "> <"+tm_state.toString()+"> [" + address + "] " + Arrays.toString(data);
+		return "<" + state.toString() + "> [" + address + "] " + Arrays.toString(data);
 	}
 }
