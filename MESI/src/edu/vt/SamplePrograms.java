@@ -71,7 +71,7 @@ public class SamplePrograms {
 	};
 	
 
-	static Program Lock1_Prog = new edu.vt.sim.tm.Program(){
+	static Program TAS_Lock1_Prog = new edu.vt.sim.tm.Program(){
 		public void execute() {
 			byte[] data;
 			do{
@@ -87,7 +87,7 @@ public class SamplePrograms {
 		}
 	};
 	
-	static Program Lock2_Prog = new edu.vt.sim.tm.Program(){
+	static Program TAS_Lock2_Prog = new edu.vt.sim.tm.Program(){
 		public void execute() {
 			byte[] data;
 			do{
@@ -95,14 +95,25 @@ public class SamplePrograms {
 			}while(data[0]==1);	// successful acquire the lock
 
 			// critical section start
-			write(1, new byte[] {1, 2});
-			write(2, new byte[] {3, 4});
+			write(1, new byte[] {5, 6});
+			write(2, new byte[] {7, 8});
 			// critical section ends
 			
 			write(0, new byte[] {0, 0});	// release the lock
 		}
 	};
 
+	public static class TMCounter extends edu.vt.sim.tm.Program{
+		public void execute() {
+			atomic_begin();
+			byte[] b = read(1);
+			b[0]++; 
+			write(1, b); 
+			atomic_end();
+		}
+	};
+	
+	
 	static Program TTAS_Lock1_Prog = new edu.vt.sim.tm.Program(){
 		public void execute() {
 			byte[] data;
@@ -145,4 +156,22 @@ public class SamplePrograms {
 		}
 	};
 	
+
+	public static class LockCounter extends edu.vt.sim.tm.Program{
+		public void execute() {
+			byte[] data;
+			do{
+				data = test_and_set(0, new byte[]{1, 0});
+			}while(data[0]==1);	// successful acquire the lock
+
+			// critical section start
+			byte[] b = read(1);
+			b[0]++; 
+			write(1, b); 
+			// critical section ends
+			
+			write(0, new byte[] {0, 0});	// release the lock
+		}
+	};
+
 }

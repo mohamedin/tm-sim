@@ -7,17 +7,17 @@ public class Test {
 	
 	public static void main(String[] args) {
 		// configuration
-//		System.setProperty("verbose", "true");
+		System.setProperty("verbose", "true");
 		
 		Config.CORES = 2;
 		Config.MEM_SIZE = 8;
 		Config.BLOCK_SIZE = 2;
-		Model model = new Model(SamplePrograms.Lock1_Prog, SamplePrograms.Lock2_Prog);
+		Model model = new Model(new SamplePrograms.LockCounter(), new SamplePrograms.LockCounter());
 		model.start();
 		
 		Config.CACHE_CLASS = edu.vt.arch.cache.tm1.Cache.class;
 		Config.MEM_SIZE /=2;
-		Model tmModel = new Model(SamplePrograms.TM1_Prog, SamplePrograms.TM2_Prog);
+		Model tmModel = new Model(new SamplePrograms.TMCounter(), new SamplePrograms.TMCounter());
 		tmModel.start();
 
 		// output

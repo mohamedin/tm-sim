@@ -10,6 +10,8 @@ public interface ICache extends IBusComponent{
 	public byte[] read(int address);
 	public void write(int address, byte data[]);
 	
+	public byte[] test_and_set(int address, byte[] data);
+	
 	public void connectToAddressBus(AddressBus addressBus);
 	public void connectToSharedBus(SharedBus sharedBus);
 	public void connectToDataBus(DataBus dataBus);

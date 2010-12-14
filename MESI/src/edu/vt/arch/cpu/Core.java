@@ -18,6 +18,10 @@ public class Core extends Thread{
 		cache.write(address, data);
 	}
 	
+	public byte[] test_and_set(int address, byte[] data){
+		return cache.test_and_set(address, data);
+	}
+	
 	public void atomic_begin(){
 		((Cache)cache).startTM();
 	}

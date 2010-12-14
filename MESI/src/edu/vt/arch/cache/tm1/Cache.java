@@ -6,6 +6,7 @@ import edu.vt.arch.com.AddressBus;
 import edu.vt.arch.com.DataBus;
 import edu.vt.arch.com.SharedBus;
 import edu.vt.arch.com.Signal;
+import edu.vt.arch.com.Signal.Type;
 import edu.vt.arch.mem.Stall;
 import edu.vt.sim.tm.TransactionConflictException;
 import edu.vt.util.Config;
@@ -44,48 +45,55 @@ public class Cache implements ICache{
 	}
 
 	private void access(int address, Signal.Type type){
+		if(transactionActive && transactionAborted){
+			transactionActive = transactionAborted = false;
+			throw new TransactionConflictException();
+		}
+		int cacheStatus = cached(address);
+		if(cacheStatus==1 && blocks[index(address)].state.equals(State.SHARED) && type.equals(Type.READ_FOR_OWNERSHIP))
+			cacheStatus = 0;
+		switch(cacheStatus){
+			case 1:	// cache read hit 
+				Stall.stall(Config.CACHE_ACCESS_TIME); 
+				break;
+			case -1:  // uncached & write back needed
+				writeBack(index(address));
+			case 0: // uncached
+				workingAddress = address;
+				addressBus.broadcast(this, new Signal(address, type));
+				Stall.stall(Config.MEM_ACCESS_TIME);
+				if(backoff){
+					Stall.stall(Config.MEM_WRITE_BACK_TIME);
+					blocks[index(address)].state = State.SHARED;
+				}
+				backoff = false;
+				workingAddress = -1;
+				break;
+		}
+	}
+
+	private void busAcquire(int address, Signal.Type type){
 		try {
 			addressBus.acquire();
 			dataBus.acquire();
-			if(transactionActive && transactionAborted){
-				transactionActive = transactionAborted = false;
-				throw new TransactionConflictException();
-			}
-			switch(cached(address)){
-				case 1:	// cache read hit 
-					Stall.stall(Config.CACHE_ACCESS_TIME); 
-					break;
-				case -1:  // uncached & write back needed
-					writeBack(index(address));
-				case 0: // uncached
-					workingAddress = address;
-					addressBus.broadcast(this, new Signal(address, type));
-					Stall.stall(Config.MEM_ACCESS_TIME);
-					if(backoff){
-						Stall.stall(Config.MEM_WRITE_BACK_TIME);
-						blocks[index(address)].state = State.SHARED;
-					}
-					backoff = false;
-					workingAddress = -1;
-					break;
-			}
+			access(address, type);
 		} finally {
 			addressBus.release();
 			dataBus.release();
 		}
 	}
-	
+
 	public byte[] read(int address) {
-		access(address, Signal.Type.READ);
+		busAcquire(address, Signal.Type.READ);
 		return blocks[index(address)].getData();
 	}
 
 	public void write(int address, byte data[]) {
-		access(address, Signal.Type.READ_FOR_OWNERSHIP);
+		busAcquire(address, Signal.Type.READ_FOR_OWNERSHIP);
 		blocks[index(address)].setData(data);
 		blocks[index(address)].state = State.MODIFIED;
 	}
-	
+
 	private void writeBack(int index) {
 		dataBus.broadcast(this, new Signal(blocks[index].address, Signal.Type.WRITE, blocks[index].getData()));
 		blocks[index].state = State.SHARED;
@@ -196,5 +204,11 @@ public class Cache implements ICache{
 
 	public void startTM() {
 		transactionActive = true;	
+	}
+
+	@Override
+	public byte[] test_and_set(int address, byte[] data) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }
